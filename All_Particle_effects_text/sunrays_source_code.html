@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas Text Masterclass</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&display=swap" rel="stylesheet">
+<style>
+* {
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+    font-family: 'Bangers', cursive;
+}
+
+canvas {
+    background: black;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+input {
+    position: absolute;
+    width: calc(100% - 20px);
+    padding: 10px;
+    margin: 10px;
+    z-index: 100;
+}
+</style>
+</head>
+<body>
+    <canvas id="canvas1"></canvas>
+    <input type="text" id="textInput" placeholder="Type something..." value="A">
+
+<script>
+window.addEventListener('load', function(){
+    const canvas = document.getElementById('canvas1');
+    const ctx = canvas.getContext('2d', {
+        willReadFrequently: true
+    });
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    class Particle {
+        constructor(effect, x, y, color){
+            this.effect = effect;
+            this.x = Math.random() * this.effect.canvasWidth;
+            this.y = this.effect.canvasHeight;
+            this.color = color;
+            this.originX = x;
+            this.originY = y;
+            this.size = this.effect.gap - 1;
+            this.dx = 0;
+            this.dy = 0;
+            this.vx = 0;
+            this.vy = 0;
+            this.force = 0;
+            this.angle = 0;
+            this.distance = 0;
+            this.friction = Math.random() * 0.35 + 0.62
+            this.ease = Math.random() * 0.05 + 0.05;
+            this.randomise = Math.random();
+            this.connectDistance = 150000;
+        }
+        draw(){
+            if (this.randomise < 0.1 && this.distance < this.connectDistance - 5){
+                const opacity = 1 - (this.distance/this.connectDistance);
+                this.effect.context.beginPath();
+                this.effect.context.moveTo(this.x + this.size * 0.5, this.y + this.size * 0.5);
+                this.effect.context.lineTo(this.effect.mouse.x, this.effect.mouse.y);
+                this.effect.context.save();
+                this.effect.context.globalAlpha = opacity;
+                this.effect.context.stroke();
+                this.effect.context.restore();
+            }
+            this.effect.context.fillStyle = this.color;
+            this.effect.context.fillRect(this.x, this.y, this.size, this.size);
+        }
+        update(){
+            this.dx = this.effect.mouse.x - this.x;
+            this.dy = this.effect.mouse.y - this.y;
+            this.distance = this.dx * this.dx + this.dy * this.dy;
+            this.force = -this.effect.mouse.radius / this.distance;
+
+            if (this.distance < this.effect.mouse.radius){
+                this.angle = Math.atan2(this.dy, this.dx);
+                this.vx += this.force * Math.cos(this.angle);
+                this.vy += this.force * Math.sin(this.angle);
+            }
+
+            this.x += (this.vx *= this.friction) + (this.originX - this.x) * this.ease;
+            this.y += (this.vy *= this.friction) + (this.originY - this.y) * this.ease;
+        }
+    }
+
+    class Effect {
+        constructor(context, canvasWidth, canvasHeight){
+            this.context = context;
+            this.canvasWidth = canvasWidth;
+            this.canvasHeight = canvasHeight;
+            this.textX = this.canvasWidth / 2;
+            this.textY = this.canvasHeight / 2;
+            this.fontSize = 300;
+            this.lineHeight = this.fontSize * 0.9;
+            this.maxTextWidth = this.canvasWidth * 0.7;
+            this.textInput = document.getElementById('textInput');
+            this.verticalOffset = 0;
+            this.textInput.addEventListener('keyup', (e) => {
+                if (e.key !==' ') {
+                    this.context.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+                    this.wrapText(e.target.value);
+                }
+            });
+            // particle text
+            this.particles = [];
+            this.gap = 6;
+            this.mouse = {
+                radius: 5000,
+                x: 0,
+                y: 0
+            }
+            window.addEventListener('mousemove', (e) => {
+                this.mouse.x = e.x;
+                this.mouse.y = e.y;
+            });           
+        }
+        wrapText(text){
+            // canvas settings
+            const gradient = this.context.createLinearGradient(0, 0, 0, this.canvasHeight);
+            gradient.addColorStop(0.4, 'gold');
+            gradient.addColorStop(0.45, '#fd8046');
+            gradient.addColorStop(0.5, '#d36c50');
+            gradient.addColorStop(0.55, '#aa585b');
+            gradient.addColorStop(0.6, '#804565');
+            const gradient2 = this.context.createLinearGradient(0, 0, 0, this.canvasHeight);
+            gradient2.addColorStop(0.45, 'gold');
+            gradient2.addColorStop(0.5, '#573170');
+            gradient2.addColorStop(0.55, '#804565');
+            this.context.fillStyle = gradient;
+            this.context.textAlign = 'center';
+            this.context.textBaseline =1;
+            this.context.strokeStyle = gradient2;
+            this.context.lineWidth = 5;
+            this.context.font = this.fontSize + 'px Bangers';
+            // break multiline text
+            let linesArray = [];
+            let words = text.split(' ');
+            let lineCounter = 0;
+            let line = '';
+            for ( let i = 0; i < words.length; i++ ){
+                let testLine = line + words[i] + ' ';
+                if (this.context.measureText(testLine).width > this.maxTextWidth){
+                    line = words[i] + ' ';
+                    lineCounter++;
+                } else {
+                    line = testLine;
+                }
+                linesArray[lineCounter] = line;
+            }
+            let textHeight = this.lineHeight * lineCounter;
+            this.textY = this.canvasHeight / 2 - textHeight / 2 + this.verticalOffset;
+            linesArray.forEach((el, index) => {
+                this.context.fillText(el, this.textX, this.textY + (index * this.lineHeight));
+                this.context.strokeText(el, this.textX, this.textY + (index * this.lineHeight));
+            });
+            this.context.strokeStyle = gradient;
+            this.context.lineWidth = 1
+            this.convertToParticles();
+        }
+        convertToParticles(){
+            this.particles = [];
+            const pixels = this.context.getImageData(0, 0, this.canvasWidth, this.canvasHeight).data;
+            this.context.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+            for (let y = 0; y < this.canvasHeight; y += this.gap){
+                for (let x = 0; x < this.canvasWidth; x+= this.gap){
+                    const index = (y * this.canvasWidth + x) * 4;
+                    const alpha = pixels[index + 3];
+                    if (alpha > 0){
+                        const red = pixels[index];
+                        const green = pixels[index + 1];
+                        const blue = pixels[index + 2];
+                        const color = 'rgb(' + red + ',' + green + ',' + blue + ')';
+                        this.particles.push(new Particle(this, x, y, color));
+                    }
+                }
+            }
+        }
+        render(){
+            this.particles.forEach(particle => {
+                particle.update();
+                particle.draw();
+            });
+        }
+        resize(width, height){
+            this.canvasWidth = width;
+            this.canvasHeight = height;
+            this.textX = this.canvasWidth / 2;
+            this.textY = this.canvasHeight / 2;
+            this.maxTextWidth = this.canvasWidth * 0.8;
+        }
+    }
+
+    const effect = new Effect(ctx, canvas.width, canvas.height);
+    effect.wrapText(effect.textInput.value);
+    effect.render();
+
+    function animate(){
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        effect.render();
+        requestAnimationFrame(animate);
+    }
+    animate();
+
+    window.addEventListener('resize', function(){
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        effect.resize(canvas.width, canvas.height);
+        effect.wrapText(effect.textInput.value);
+        console.log('resize');
+    });
+
+});
+</script>
+</body>
+</html>
